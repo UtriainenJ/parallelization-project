@@ -38,15 +38,21 @@ target_link_libraries(parallel OpenMP::OpenMP_C)
 # to the build directory. If you know enough CMake magic, feel free to fix this and let me know.
 # Note, that the build seems to fail (at least on Visual Studio) if parallel.cl does not exist.
 #
-# find_package(OpenCL REQUIRED)
-# target_include_directories(parallel PRIVATE ${OpenCL_INCLUDE_DIRS})
-# target_link_libraries(parallel ${OpenCL_LIBRARIES})
-# add_custom_command(
-#     TARGET parallel POST_BUILD
-#     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-#     "${CMAKE_SOURCE_DIR}/parallel.cl"
-#     $<TARGET_FILE_DIR:parallel>
-#     VERBATIM)
+
+# Uncomment to use OpenCL SDK included in the project (Windows only)
+#set(OpenCL_ROOT "${CMAKE_SOURCE_DIR}/OpenCL-SDK-v2025.07.23-Win-x64")
+#set(OpenCL_INCLUDE_DIR "${OpenCL_ROOT}/include")
+#set(OpenCL_LIBRARY "${OpenCL_ROOT}/lib/OpenCL.lib")
+
+find_package(OpenCL REQUIRED)
+target_include_directories(parallel PRIVATE ${OpenCL_INCLUDE_DIRS})
+target_link_libraries(parallel ${OpenCL_LIBRARIES})
+add_custom_command(
+    TARGET parallel POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${CMAKE_SOURCE_DIR}/parallel.cl"
+    $<TARGET_FILE_DIR:parallel>
+    VERBATIM)
 
 
 # Find and link SDL2
