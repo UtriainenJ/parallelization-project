@@ -49,6 +49,11 @@ target_link_libraries(parallel OpenMP::OpenMP_C)
 #     VERBATIM)
 
 
+# Set default build type to Release
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
 # Find and link SDL2
 if (WIN32)
     set(SDL2_DIR "${CMAKE_SOURCE_DIR}/SDL2-2.32.10/cmake")
