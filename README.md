@@ -13,3 +13,9 @@ Win64 binaries for SDL2 and OpenCL ICD/loader are optionally included.
 
 **Note on Git History**:  
 > Development began before this repository was initialized. The early implementation milestones were added retroactively.
+
+Exercise template by: Matias Koskela matias.koskela@tut.fi
+                      Heikki Kultala heikki.kultala@tut.fi
+                      Topi Leppanen  topi.leppanen@tuni.fi
+
+Implementation/solution by me
