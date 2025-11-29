@@ -293,8 +293,11 @@ void parallelPhysicsEngine(){
 // Rendering loop (This is called once a frame after physics engine)
 // Decides the color for each pixel.
 void parallelGraphicsEngine(){
-   size_t globalWorkSize = SIZE;
-   size_t localWorkSize = WORKGROUP_SIZE;
+   //size_t globalWorkSize = SIZE;
+   //size_t localWorkSize = WORKGROUP_SIZE;
+
+   size_t globalWorkSize[2] = { WINDOW_WIDTH, WINDOW_HEIGHT };
+   size_t localWorkSize[2]  = { 4, 4 };
 
    // kernel create
 
@@ -344,10 +347,10 @@ void parallelGraphicsEngine(){
    result = clEnqueueNDRangeKernel(
        queue,
        graphicsKernel,
-       1,
+       2,
        NULL,
-       &globalWorkSize,
-       &localWorkSize,
+       globalWorkSize,
+       localWorkSize,
        0,
        NULL,
        NULL

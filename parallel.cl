@@ -49,10 +49,13 @@ __kernel void graphicsEngine(
 
 
     // Graphics pixel loop
-   int i = get_global_id(0);
-
+   
+   //int i = get_global_id(0);
    // Row wise ordering
-   floatvector pixel = {.x = i % WINDOW_WIDTH, .y = i / WINDOW_WIDTH};
+   //floatvector pixel = {.x = i % WINDOW_WIDTH, .y = i / WINDOW_WIDTH};
+
+   floatvector pixel = {.x = get_global_id(0), .y = get_global_id(1)};
+   int i = pixel.y * WINDOW_WIDTH + pixel.x;
 
    // Draw the black hole
    floatvector positionToBlackHole = {.x = pixel.x -
