@@ -26,6 +26,9 @@ VERSION 25.0 - add macOS support
 #include <stdlib.h>
 #include <string.h>
 
+#include "CL/opencl.h" // maybe works?
+#include <assert.h>
+
 int mousePosX;
 int mousePosY;
 
@@ -46,7 +49,7 @@ int mousePosY;
 #define PHYSICSUPDATESPERFRAME 100000
 #define BLACK_HOLE_RADIUS 4.5f
 
-
+#define WORKGROUP_SIZE 16
 
 // Stores 2D data like the coordinates
 typedef struct{
@@ -92,7 +95,14 @@ color_u8* correctPixels;
 satellite* satellites;
 satellite* backupSatelites;
 
-
+typedef struct{
+   int windowHeight;
+   int windowWidth;
+   int size;
+   int satelliteCount;
+   float satelliteRadius;
+   float blackHoleRadius;
+} Constants;
 
 
 
@@ -100,14 +110,109 @@ satellite* backupSatelites;
 
 
 // ## You may add your own variables here ##
+cl_int result;
+cl_context context;
+cl_command_queue queue;
+cl_program program;
 
+Constants consts = {WINDOW_HEIGHT, WINDOW_WIDTH, SIZE,
+            SATELLITE_COUNT, SATELLITE_RADIUS,
+            BLACK_HOLE_RADIUS};
 
+// this load file function generated with chatGPT. Reads the contents of a file into a char*.
+char* loadFile(const char* path) {
+    // Open the file at 'path' in binary read mode ("rb")
+    FILE* f = fopen(path, "rb");  
+    // Check if fopen failed (f == NULL)
+    if (!f) { 
+        perror("fopen");   // Print an error message to stderr
+        exit(1);           // Terminate the program with exit code 1
+    }
+
+    fseek(f, 0, SEEK_END);       // Move the file pointer to the end to find file size
+    long size = ftell(f);        // Get the current position (file size in bytes)
+    rewind(f);                   // Move file pointer back to start of the file
+
+    char* src = malloc(size + 1);  // Allocate memory to hold file contents + null terminator
+    fread(src, 1, size, f);        // Read 'size' bytes from the file into 'src'
+    src[size] = '\0';               // Null-terminate the buffer to make it a valid C string
+    fclose(f);                      // Close the file to free resources
+    return src;                     // Return pointer to the file contents
+}
 
 
 // ## You may add your own initialization routines here ##
 void init(){
 
+   // device name
+    cl_platform_id platforms[16];
+    cl_device_id devices[16];
+    cl_uint platformCount = 0;
 
+    cl_int res = clGetPlatformIDs(16, platforms, &platformCount);
+    assert(res == CL_SUCCESS);
+
+    for (cl_uint i = 0; i < platformCount; i++) {
+
+        cl_uint deviceCount = 0;
+
+        clGetDeviceIDs(platforms[i], CL_DEVICE_TYPE_GPU,
+                       16, devices, &deviceCount);
+
+        for (cl_uint d = 0; d < deviceCount; d++) {
+            char vendor[128];
+            clGetDeviceInfo(devices[d],
+                            CL_DEVICE_VENDOR,
+                            sizeof(vendor),
+                            vendor,
+                            NULL);
+
+            printf("GPU found: %s at devices [%u]\n", vendor, d);
+        }
+    }
+
+    // context
+    context = clCreateContext(
+        NULL,
+        1,
+        &devices[0],
+        NULL,
+        NULL,
+        &result
+    );
+   assert(result == CL_SUCCESS);
+
+   // command queue
+   cl_queue_properties props[] = {
+    0   // ends the properties list
+   };
+   queue = clCreateCommandQueueWithProperties(context, devices[0], props, &result);
+   assert(result == CL_SUCCESS);
+
+   // program
+   const char* programSrc = loadFile("parallel.cl");
+   program = 
+         clCreateProgramWithSource(
+            context,
+            1,
+            &programSrc,
+            NULL,
+            &result
+         );
+   assert(result == CL_SUCCESS);
+   free((void*)programSrc);
+
+   result = clBuildProgram(
+       program,
+       1,
+       &devices[0],
+       NULL, // maybe test compilation options if I have time?
+       NULL,
+       NULL
+   );
+   assert(result == CL_SUCCESS);
+
+   printf("OpenCL initialization done.\n");
 }
 
 // ## You are asked to make this code parallel ##
@@ -188,95 +293,89 @@ void parallelPhysicsEngine(){
 // Rendering loop (This is called once a frame after physics engine)
 // Decides the color for each pixel.
 void parallelGraphicsEngine(){
+   size_t globalWorkSize = SIZE;
+   size_t localWorkSize = WORKGROUP_SIZE;
 
-   int tmpMousePosX = mousePosX;
-   int tmpMousePosY = mousePosY;
+   // kernel create
 
-    // Graphics pixel loop
-   int i;
-   #pragma omp parallel for
-   for(i = 0 ;i < SIZE; ++i) {
+   cl_kernel graphicsKernel = clCreateKernel(
+       program,
+       "graphicsEngine",
+       &result
+   );
+   assert(result == CL_SUCCESS);
+ 
+   // kernel args
 
-      // Row wise ordering
-      floatvector pixel = {.x = i % WINDOW_WIDTH, .y = i / WINDOW_WIDTH};
+   cl_mem constBuffer = clCreateBuffer(
+       context,
+       CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+       sizeof(Constants),
+       &consts,
+       &result
+   );
+   assert(result == CL_SUCCESS);
+   clSetKernelArg(graphicsKernel, 0, sizeof(cl_mem), &constBuffer);
+   
+   cl_mem pixelBuffer = clCreateBuffer(
+       context,
+       CL_MEM_WRITE_ONLY,
+       sizeof(color_u8) * SIZE,
+       NULL,
+       &result
+   );
+   assert(result == CL_SUCCESS);
+   clSetKernelArg(graphicsKernel, 1, sizeof(cl_mem), &pixelBuffer);
 
-      // Draw the black hole
-      floatvector positionToBlackHole = {.x = pixel.x -
-         tmpMousePosX, .y = pixel.y - tmpMousePosY};
-      float distToBlackHoleSquared =
-         positionToBlackHole.x * positionToBlackHole.x +
-         positionToBlackHole.y * positionToBlackHole.y;
-      float distToBlackHole = sqrt(distToBlackHoleSquared);
-      if (distToBlackHole < BLACK_HOLE_RADIUS) {
-         pixels[i].red = 0;
-         pixels[i].green = 0;
-         pixels[i].blue = 0;
-         continue; // Black hole drawing done
-      }
+   cl_mem satelliteBuffer = clCreateBuffer(
+       context,
+       CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+       sizeof(satellite) * SATELLITE_COUNT,
+       satellites,
+       &result
+   );
+   assert(result == CL_SUCCESS);
+   clSetKernelArg(graphicsKernel, 2, sizeof(cl_mem), &satelliteBuffer);
 
-      // This color is used for coloring the pixel
-      color_f32 renderColor = {.red = 0.f, .green = 0.f, .blue = 0.f};
+   clSetKernelArg(graphicsKernel, 3, sizeof(int), &mousePosX);
+   clSetKernelArg(graphicsKernel, 4, sizeof(int), &mousePosY);
 
-      // Find closest satellite
-      float shortestDistance = INFINITY;
+   // kernel execution in to queue
+   result = clEnqueueNDRangeKernel(
+       queue,
+       graphicsKernel,
+       1,
+       NULL,
+       &globalWorkSize,
+       &localWorkSize,
+       0,
+       NULL,
+       NULL
+   );
+   assert(result == CL_SUCCESS);
 
-      float weights = 0.f;
-      int hitsSatellite = 0;
+   result = clEnqueueReadBuffer(
+       queue, 
+       pixelBuffer, 
+       CL_TRUE, 
+       0,
+       sizeof(color_u8) * SIZE, 
+       pixels,
+       0, NULL, NULL);
+   assert(result == CL_SUCCESS);
 
-      // First Graphics satellite loop: Find the closest satellite.
-      int j;
-      for(j = 0; j < SATELLITE_COUNT; ++j){
-         floatvector difference = {.x = pixel.x - satellites[j].position.x,
-                                   .y = pixel.y - satellites[j].position.y};
-         float distance = sqrt(difference.x * difference.x +
-                               difference.y * difference.y);
-
-         if(distance < SATELLITE_RADIUS) {
-            renderColor.red = 1.0f;
-            renderColor.green = 1.0f;
-            renderColor.blue = 1.0f;
-            hitsSatellite = 1;
-            break;
-         } else {
-            float weight = 1.0f / (distance*distance*distance*distance);
-            weights += weight;
-            if(distance < shortestDistance){
-               shortestDistance = distance;
-               renderColor = satellites[j].identifier;
-            }
-         }
-      }
-
-      // Second graphics loop: Calculate the color based on distance to every satellite.
-      if (!hitsSatellite) {
-         int k;
-         for(k = 0; k < SATELLITE_COUNT; ++k){
-            floatvector difference = {.x = pixel.x - satellites[k].position.x,
-                                      .y = pixel.y - satellites[k].position.y};
-            float dist2 = (difference.x * difference.x +
-                           difference.y * difference.y);
-            float weight = 1.0f/(dist2* dist2);
-
-            renderColor.red += (satellites[k].identifier.red *
-                                weight /weights) * 3.0f;
-
-            renderColor.green += (satellites[k].identifier.green *
-                                  weight / weights) * 3.0f;
-
-            renderColor.blue += (satellites[k].identifier.blue *
-                                 weight / weights) * 3.0f;
-         }
-      }
-      pixels[i].red = (uint8_t) (renderColor.red * 255.0f);
-      pixels[i].green = (uint8_t) (renderColor.green * 255.0f);
-      pixels[i].blue = (uint8_t) (renderColor.blue * 255.0f);
-   }
+   clReleaseMemObject(constBuffer);
+   clReleaseMemObject(pixelBuffer);
+   clReleaseMemObject(satelliteBuffer);
+   clReleaseKernel(graphicsKernel);
 }
 
 // ## You may add your own destrcution routines here ##
 void destroy(){
 
-
+clReleaseContext(context);
+clReleaseCommandQueue(queue);
+clReleaseProgram(program);
 }
 
 
