@@ -26,8 +26,8 @@ add_executable(parallel parallel.c)
 # endif()
 #
 # UNCOMMENT THESE TO ENABLE OPENMP
-# find_package(OpenMP REQUIRED)
-# target_link_libraries(parallel OpenMP::OpenMP_C)
+find_package(OpenMP REQUIRED)
+target_link_libraries(parallel OpenMP::OpenMP_C)
 
 
 # UNCOMMENT THESE TO ENABLE OPENCL
@@ -69,3 +69,6 @@ else()
     # Math library shouldn't be linked on Windows, but must be linked on Linux
     target_link_libraries(parallel m)
 endif()
+
+#  FLAGS
+target_compile_options(parallel PRIVATE -fopt-info-vec -ffast-math -march=native)

@@ -127,18 +127,20 @@ void parallelPhysicsEngine(){
 
    int idx;
    for (idx = 0; idx < SATELLITE_COUNT; ++idx) {
-       tmpPosition[idx].x = satellites[idx].position.x;
-       tmpPosition[idx].y = satellites[idx].position.y;
-       tmpVelocity[idx].x = satellites[idx].velocity.x;
-       tmpVelocity[idx].y = satellites[idx].velocity.y;
+      tmpPosition[idx].x = satellites[idx].position.x;
+      tmpPosition[idx].y = satellites[idx].position.y;
+      tmpVelocity[idx].x = satellites[idx].velocity.x;
+      tmpVelocity[idx].y = satellites[idx].velocity.y;
    }
    int physicsUpdateIndex;
+
    // Physics iteration loop
    for(physicsUpdateIndex = 0;
-       physicsUpdateIndex < PHYSICSUPDATESPERFRAME;
+      physicsUpdateIndex < PHYSICSUPDATESPERFRAME;
       ++physicsUpdateIndex){
       int i;
-       // Physics satellite loop
+      // Physics satellite loop
+      //#pragma omp parallel for
       for(i = 0; i < SATELLITE_COUNT; ++i){
 
          // Distance to the blackhole (bit ugly code because C-struct cannot have member functions)
@@ -175,12 +177,11 @@ void parallelPhysicsEngine(){
    // copy back the float storage.
    int idx2;
    for (idx2 = 0; idx2 < SATELLITE_COUNT; ++idx2) {
-       satellites[idx2].position.x = tmpPosition[idx2].x;
-       satellites[idx2].position.y = tmpPosition[idx2].y;
-       satellites[idx2].velocity.x = tmpVelocity[idx2].x;
-       satellites[idx2].velocity.y = tmpVelocity[idx2].y;
+      satellites[idx2].position.x = tmpPosition[idx2].x;
+      satellites[idx2].position.y = tmpPosition[idx2].y;
+      satellites[idx2].velocity.x = tmpVelocity[idx2].x;
+      satellites[idx2].velocity.y = tmpVelocity[idx2].y;
    }
-
 }
 
 // ## You are asked to make this code parallel ##
@@ -192,8 +193,9 @@ void parallelGraphicsEngine(){
    int tmpMousePosY = mousePosY;
 
     // Graphics pixel loop
-    int i;
-    for(i = 0 ;i < SIZE; ++i) {
+   int i;
+   #pragma omp parallel for
+   for(i = 0 ;i < SIZE; ++i) {
 
       // Row wise ordering
       floatvector pixel = {.x = i % WINDOW_WIDTH, .y = i / WINDOW_WIDTH};
@@ -515,8 +517,8 @@ void compute(void){
      int totalTime = finishTime - previousFinishTime;
      previousFinishTime = finishTime;
 
-     printf("Latency of this frame %i + %i : %ims \n",
-             satelliteMovementTime, pixelColoringTime, totalTime);
+     printf("%i Latency of this frame %i + %i : %ims \n",
+             frameCount, satelliteMovementTime, pixelColoringTime, totalTime);
 
      frameCount++;
      totalTimeAcc += totalTime;
