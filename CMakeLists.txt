@@ -54,6 +54,11 @@ add_custom_command(
     $<TARGET_FILE_DIR:parallel>
     VERBATIM)
 
+# Set default build type to Release
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
 
 # Find and link SDL2
 if (WIN32)
