@@ -49,7 +49,7 @@ int mousePosY;
 #define PHYSICSUPDATESPERFRAME 100000
 #define BLACK_HOLE_RADIUS 4.5f
 
-#define WORKGROUP_SIZE 16
+#define WORKGROUP_SIZE 256
 
 // Stores 2D data like the coordinates
 typedef struct{
