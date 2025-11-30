@@ -82,4 +82,4 @@ else()
 endif()
 
 #  FLAGS
-target_compile_options(parallel PRIVATE -fopt-info-vec -ffast-math -march=native)
+target_compile_options(parallel PRIVATE /O2 /fp:fast)
