@@ -55,3 +55,7 @@ dkms.conf
 *.dwo
 
 build/*
+
+out/*
+.vs/*
+CMakeSettings.json
